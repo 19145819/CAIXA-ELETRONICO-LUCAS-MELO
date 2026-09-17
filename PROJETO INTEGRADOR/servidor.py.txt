@@ -1,0 +1,285 @@
+import socket
+
+# ==========================================
+# CONFIGURAÇÕES DO SERVIDOR
+# ==========================================
+
+HOST = '127.0.0.1'
+PORTA = 5000
+
+# Credenciais utilizadas para teste
+USUARIO_TESTE = 'USUARIO TESTES'
+SENHA_TESTE = '54321'
+
+# Saldo inicial da conta
+saldo = 0.0
+
+
+# ==========================================
+# FUNÇÕES DE COMUNICAÇÃO
+# ==========================================
+
+def enviar_mensagem(conexao, mensagem):
+    """
+    Codifica a mensagem em bytes e envia ao cliente.
+    """
+    conexao.send(mensagem.encode())
+
+
+def receber_mensagem(conexao):
+    """
+    Recebe os dados enviados pelo cliente
+    e transforma os bytes em texto.
+    """
+    dados = conexao.recv(1024)
+
+    if not dados:
+        return None
+
+    return dados.decode()
+
+
+# ==========================================
+# EXECUÇÃO DO SERVIDOR
+# ==========================================
+
+def iniciar_servidor():
+    global saldo
+
+    # Criação do socket TCP
+    servidor_socket = socket.socket(
+        socket.AF_INET,
+        socket.SOCK_STREAM
+    )
+
+    # Permite reutilizar a porta após o encerramento
+    servidor_socket.setsockopt(
+        socket.SOL_SOCKET,
+        socket.SO_REUSEADDR,
+        1
+    )
+
+    # Vincula o servidor ao endereço e à porta
+    servidor_socket.bind((HOST, PORTA))
+
+    # Coloca o servidor em modo de escuta
+    servidor_socket.listen(1)
+
+    print("=" * 45)
+    print("          SERVIDOR DO CAIXA ELETRÔNICO")
+    print("=" * 45)
+    print(f"[SERVIDOR] Aguardando conexão em {HOST}:{PORTA}")
+
+    # Aceita a conexão do cliente
+    conexao, endereco = servidor_socket.accept()
+
+    print(f"[SERVIDOR] Cliente conectado: {endereco}")
+
+    try:
+        # ==================================
+        # AUTENTICAÇÃO DO CLIENTE
+        # ==================================
+
+        autenticado = False
+
+        while not autenticado:
+
+            login = receber_mensagem(conexao)
+
+            if login is None:
+                return
+
+            senha = receber_mensagem(conexao)
+
+            if senha is None:
+                return
+
+            print(f"[SERVIDOR] Tentativa de login: {login}")
+
+            # Verifica as credenciais informadas
+            if login == USUARIO_TESTE and senha == SENHA_TESTE:
+
+                enviar_mensagem(
+                    conexao,
+                    "sucesso"
+                )
+
+                autenticado = True
+
+                print("[SERVIDOR] Login realizado com sucesso.")
+
+            else:
+
+                enviar_mensagem(
+                    conexao,
+                    "falha"
+                )
+
+                print("[SERVIDOR] Login ou senha incorretos.")
+
+        # ==================================
+        # MENU DE OPERAÇÕES
+        # ==================================
+
+        while True:
+
+            opcao = receber_mensagem(conexao)
+
+            if opcao is None:
+                break
+
+            # ==================================
+            # OPÇÃO 1 - DEPÓSITO
+            # ==================================
+
+            if opcao == '1':
+
+                valor_texto = receber_mensagem(conexao)
+
+                if valor_texto is None:
+                    break
+
+                try:
+
+                    valor = float(valor_texto)
+
+                    if valor <= 0:
+
+                        enviar_mensagem(
+                            conexao,
+                            "Valor de depósito inválido."
+                        )
+
+                    else:
+
+                        saldo += valor
+
+                        enviar_mensagem(
+                            conexao,
+                            f"Depósito realizado com sucesso. "
+                            f"Novo saldo: R$ {saldo:.2f}"
+                        )
+
+                        print(
+                            f"[SERVIDOR] Depósito realizado: "
+                            f"R$ {valor:.2f}"
+                        )
+
+                except ValueError:
+
+                    enviar_mensagem(
+                        conexao,
+                        "Valor inválido."
+                    )
+
+            # ==================================
+            # OPÇÃO 2 - SAQUE
+            # ==================================
+
+            elif opcao == '2':
+
+                valor_texto = receber_mensagem(conexao)
+
+                if valor_texto is None:
+                    break
+
+                try:
+
+                    valor = float(valor_texto)
+
+                    if valor <= 0:
+
+                        enviar_mensagem(
+                            conexao,
+                            "Valor de saque inválido."
+                        )
+
+                    elif valor > saldo:
+
+                        enviar_mensagem(
+                            conexao,
+                            "Saldo insuficiente."
+                        )
+
+                    else:
+
+                        saldo -= valor
+
+                        enviar_mensagem(
+                            conexao,
+                            f"Saque realizado com sucesso. "
+                            f"Novo saldo: R$ {saldo:.2f}"
+                        )
+
+                        print(
+                            f"[SERVIDOR] Saque realizado: "
+                            f"R$ {valor:.2f}"
+                        )
+
+                except ValueError:
+
+                    enviar_mensagem(
+                        conexao,
+                        "Valor inválido."
+                    )
+
+            # ==================================
+            # OPÇÃO 3 - CONSULTAR SALDO
+            # ==================================
+
+            elif opcao == '3':
+
+                enviar_mensagem(
+                    conexao,
+                    f"Saldo atual: R$ {saldo:.2f}"
+                )
+
+                print("[SERVIDOR] Saldo consultado.")
+
+            # ==================================
+            # OPÇÃO 4 - ENCERRAR
+            # ==================================
+
+            elif opcao == '4':
+
+                enviar_mensagem(
+                    conexao,
+                    "Conexão encerrada. Até logo!"
+                )
+
+                print("[SERVIDOR] Cliente encerrou a conexão.")
+
+                break
+
+            # ==================================
+            # OPÇÃO INVÁLIDA
+            # ==================================
+
+            else:
+
+                enviar_mensagem(
+                    conexao,
+                    "Opção inválida."
+                )
+
+    except ConnectionResetError:
+
+        print("[SERVIDOR] A conexão foi interrompida pelo cliente.")
+
+    finally:
+
+        # Fecha a conexão com o cliente
+        conexao.close()
+
+        # Fecha o socket do servidor
+        servidor_socket.close()
+
+        print("[SERVIDOR] Servidor encerrado.")
+
+
+# ==========================================
+# INÍCIO DO PROGRAMA
+# ==========================================
+
+if __name__ == "__main__":
+    iniciar_servidor()
