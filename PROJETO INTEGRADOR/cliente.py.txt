@@ -1,234 +1,151 @@
 import socket
 
-# ==========================================
-# CONFIGURAÇÕES DO CLIENTE
-# ==========================================
-
 HOST = '127.0.0.1'
 PORTA = 5000
 
 
-# ==========================================
-# FUNÇÕES DE COMUNICAÇÃO
-# ==========================================
-
+# Envia uma mensagem
 def enviar_mensagem(conexao, mensagem):
-    """
-    Codifica a mensagem em bytes e envia ao servidor.
-    """
-    conexao.send(mensagem.encode())
+    dados = mensagem.encode('utf-8')
+    conexao.sendall(len(dados).to_bytes(4, byteorder='big'))
+    conexao.sendall(dados)
 
 
+# Recebe a quantidade de bytes necessária
+def receber_bytes(conexao, quantidade):
+    dados = b''
+
+    while len(dados) < quantidade:
+        parte = conexao.recv(quantidade - len(dados))
+
+        if not parte:
+            return None
+
+        dados += parte
+
+    return dados
+
+
+# Recebe uma mensagem
 def receber_mensagem(conexao):
-    """
-    Recebe os dados enviados pelo servidor
-    e transforma os bytes em texto.
-    """
-    dados = conexao.recv(1024)
+    tamanho_bytes = receber_bytes(conexao, 4)
+
+    if not tamanho_bytes:
+        return None
+
+    tamanho = int.from_bytes(tamanho_bytes, byteorder='big')
+    dados = receber_bytes(conexao, tamanho)
 
     if not dados:
         return None
 
-    return dados.decode()
+    return dados.decode('utf-8')
 
 
-# ==========================================
-# EXECUÇÃO DO CLIENTE
-# ==========================================
-
-def iniciar_cliente():
-
-    # Criação do socket TCP
+def cliente():
+    # Cria o socket TCP
     cliente_socket = socket.socket(
         socket.AF_INET,
         socket.SOCK_STREAM
     )
 
     try:
-
-        # Conecta ao servidor
         cliente_socket.connect((HOST, PORTA))
 
-        print("\n" + "=" * 45)
+        print("\n" + "=" * 50)
         print("          CAIXA ELETRÔNICO")
-        print("=" * 45)
-
-        # ==================================
-        # AUTENTICAÇÃO
-        # ==================================
+        print("=" * 50)
 
         autenticado = False
 
+        # Login
         while not autenticado:
-
             login = input("Digite seu login: ")
             senha = input("Digite sua senha: ")
 
-            # Envia login e senha ao servidor
             enviar_mensagem(cliente_socket, login)
             enviar_mensagem(cliente_socket, senha)
 
-            # Recebe a resposta da autenticação
             resposta = receber_mensagem(cliente_socket)
 
             if resposta is None:
-
-                print("[CLIENTE] O servidor encerrou a conexão.")
+                print("[CLIENTE] Servidor encerrou a conexão.")
                 return
 
             if resposta == "sucesso":
-
                 print("\n[CLIENTE] Login realizado com sucesso!")
-
                 autenticado = True
-
             else:
-
                 print("\n[CLIENTE] Login ou senha inválidos.")
                 print("[CLIENTE] Tente novamente.")
 
-        # ==================================
-        # MENU DE OPERAÇÕES
-        # ==================================
-
+        # Menu
         while True:
-
-            print("\n" + "=" * 45)
+            print("\n" + "=" * 50)
             print("          MENU DE OPERAÇÕES")
-            print("=" * 45)
+            print("=" * 50)
             print("1 - Depositar")
             print("2 - Sacar")
             print("3 - Visualizar Saldo")
             print("4 - Sair")
-            print("=" * 45)
+            print("=" * 50)
 
             opcao = input("Escolha uma opção: ")
 
-            # ==================================
-            # OPÇÃO 1 - DEPÓSITO
-            # ==================================
-
+            # Depósito
             if opcao == '1':
+                valor = input("Digite o valor do depósito: ")
 
-                valor = input(
-                    "Digite o valor do depósito: "
-                )
+                enviar_mensagem(cliente_socket, opcao)
+                enviar_mensagem(cliente_socket, valor)
 
-                enviar_mensagem(
-                    cliente_socket,
-                    opcao
-                )
-
-                enviar_mensagem(
-                    cliente_socket,
-                    valor
-                )
-
-                resposta = receber_mensagem(
-                    cliente_socket
-                )
+                resposta = receber_mensagem(cliente_socket)
 
                 print(f"\n[CLIENTE] Servidor: {resposta}")
 
-            # ==================================
-            # OPÇÃO 2 - SAQUE
-            # ==================================
-
+            # Saque
             elif opcao == '2':
+                valor = input("Digite o valor do saque: ")
 
-                valor = input(
-                    "Digite o valor do saque: "
-                )
+                enviar_mensagem(cliente_socket, opcao)
+                enviar_mensagem(cliente_socket, valor)
 
-                enviar_mensagem(
-                    cliente_socket,
-                    opcao
-                )
-
-                enviar_mensagem(
-                    cliente_socket,
-                    valor
-                )
-
-                resposta = receber_mensagem(
-                    cliente_socket
-                )
+                resposta = receber_mensagem(cliente_socket)
 
                 print(f"\n[CLIENTE] Servidor: {resposta}")
 
-            # ==================================
-            # OPÇÃO 3 - CONSULTAR SALDO
-            # ==================================
-
+            # Consulta do saldo
             elif opcao == '3':
+                enviar_mensagem(cliente_socket, opcao)
 
-                enviar_mensagem(
-                    cliente_socket,
-                    opcao
-                )
-
-                resposta = receber_mensagem(
-                    cliente_socket
-                )
+                resposta = receber_mensagem(cliente_socket)
 
                 print(f"\n[CLIENTE] Servidor: {resposta}")
 
-            # ==================================
-            # OPÇÃO 4 - ENCERRAR
-            # ==================================
-
+            # Sair
             elif opcao == '4':
+                enviar_mensagem(cliente_socket, opcao)
 
-                enviar_mensagem(
-                    cliente_socket,
-                    opcao
-                )
-
-                resposta = receber_mensagem(
-                    cliente_socket
-                )
+                resposta = receber_mensagem(cliente_socket)
 
                 print(f"\n[CLIENTE] Servidor: {resposta}")
 
                 break
 
-            # ==================================
-            # OPÇÃO INVÁLIDA
-            # ==================================
-
             else:
-
                 print("\n[CLIENTE] Opção inválida.")
                 print("[CLIENTE] Escolha uma opção de 1 a 4.")
 
     except ConnectionRefusedError:
-
-        print(
-            "[CLIENTE] Não foi possível conectar ao servidor."
-        )
-
-        print(
-            "[CLIENTE] Verifique se o arquivo servidor.py "
-            "está em execução."
-        )
+        print("[CLIENTE] Não foi possível conectar ao servidor.")
 
     except ConnectionResetError:
-
-        print(
-            "[CLIENTE] A conexão foi interrompida pelo servidor."
-        )
+        print("[CLIENTE] Conexão interrompida pelo servidor.")
 
     finally:
-
-        # Fecha a conexão do cliente
         cliente_socket.close()
-
         print("[CLIENTE] Conexão encerrada.")
 
 
-# ==========================================
-# INÍCIO DO PROGRAMA
-# ==========================================
-
 if __name__ == "__main__":
-    iniciar_cliente()
+    cliente()
